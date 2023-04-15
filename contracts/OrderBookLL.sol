@@ -15,6 +15,7 @@ contract OrderBookLL {
     uint256 public constant LTV = 90;
     uint256 public constant ETH_USDT = 4;
     uint256 public constant ETH_UNI = 2;
+    uint256 public constant PER_DAY_IN_SECS = 86400;
 
     IERC20 public usdt;
 
@@ -302,6 +303,34 @@ contract OrderBookLL {
         }
 
         return (interestRates, false);
+    }
+
+    /** 
+     * Interest rate calculation for each borrower that he/she needs to pay.
+     */
+    function calculateBorrowerInterestRate(
+        address _borrower
+    ) public returns (uint256) {
+        Lender[] memory totalLenders = borrowers[_borrower];
+
+        uint256 totalInterestAmount;
+
+        for (uint256 i = 0; i < totalLenders.length; i++) {
+            Lender memory _lender = totalLenders[i];
+
+            // scaling up is done to avoid precision loss
+            uint256 interestAmount = ((_lender.interestRate * _lender.amount) *
+                1e38) / 100;
+
+            uint256 interestAmountPerSec = interestAmount /
+                (PER_DAY_IN_SECS * 365);
+
+            uint256 timeDiff = block.timestamp - _lender.time;
+
+            totalInterestAmount += (interestAmountPerSec * timeDiff);
+        }
+
+        return totalInterestAmount;
     }
 
     /**
