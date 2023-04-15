@@ -84,11 +84,17 @@ contract OrderBookLL {
         _;
     }
 
+    /**
+     * Method is used by lender to lend amount with custom interest rate.
+     *
+     * @param _interestRate Rate at which amount is lend
+     * @param _amount Total amount to be lend
+     * @param _lendToken usdt or uni token address
+     */
     function lend(
         uint256 _interestRate,
         uint256 _amount,
-        IERC20 _lendToken,
-        address _user
+        IERC20 _lendToken
     ) public {
         User storage _userInfo = userInfo[msg.sender];
 
@@ -107,12 +113,12 @@ contract OrderBookLL {
 
         userInfo[msg.sender].userInterest[(address(_lendToken))] = true;
 
-        bytes32 _newNodeHash = keccak256(abi.encode(_interestRate, _user));
+        bytes32 _newNodeHash = keccak256(abi.encode(_interestRate, msg.sender));
         Node memory node = Node(
             _interestRate,
             _amount,
             0,
-            _user,
+            msg.sender,
             block.timestamp,
             _newNodeHash
         );
@@ -120,7 +126,7 @@ contract OrderBookLL {
         if (address(_lendToken) == address(uni)) {
             (uniHead, uniTail) = interestRateLL(
                 _interestRate,
-                _user,
+                msg.sender,
                 node,
                 uniLend,
                 _newNodeHash,
@@ -133,7 +139,7 @@ contract OrderBookLL {
         if (address(_lendToken) == address(usdt)) {
             (usdtHead, usdtTail) = interestRateLL(
                 _interestRate,
-                _user,
+                msg.sender,
                 node,
                 usdtLend,
                 _newNodeHash,
@@ -145,6 +151,9 @@ contract OrderBookLL {
         }
     }
 
+    /**
+     * It is used to put the Lend info to a sorted Linked list.
+     */
     function interestRateLL(
         uint256 _interestRate,
         address _user,
@@ -206,6 +215,9 @@ contract OrderBookLL {
 
     function claimInterest() external {}
 
+    /**
+     * It is used by borrower to a token.
+     */
     function borrow(
         uint256 _borrowAmount,
         IERC20 _borrowToken
@@ -292,6 +304,9 @@ contract OrderBookLL {
         return (interestRates, false);
     }
 
+    /**
+     * Method returns whether amount can be borrowed
+     */
     function isUniBorrowAmountWithMinInterest(
         uint256 _borrowAmount
     ) public view returns (uint256[] memory, bool) {
@@ -321,6 +336,10 @@ contract OrderBookLL {
         return (interestRates, false);
     }
 
+    /**
+     * It is used to traverse through usdt LL to find whether amount
+     * can be borrowed or not.
+     */
     function findUsdtBorrowAmountWithMinInterest(
         uint256 _borrowAmount
     ) internal returns (uint256[] memory, bool) {
@@ -368,7 +387,6 @@ contract OrderBookLL {
                 break;
             }
             nodeToCheck = usdtLend[nodeToCheck].next;
-
         }
 
         if (remainingAmount == 0) {
@@ -378,6 +396,11 @@ contract OrderBookLL {
         return (interestRates, false);
     }
 
+    /**
+     * It is used to calculate max allowed borrow amount.
+     * @param _amount total amount that is borrowed
+     * @param _token Token in which amount is borrowed
+     */
     function maxAllowedBorrowBasedOnToken(
         uint256 _amount,
         IERC20 _token
@@ -393,6 +416,9 @@ contract OrderBookLL {
         return _amount * factor;
     }
 
+    /**
+     * It allows to add collateral by borrower.
+     */
     function addCollateral(uint256 _amount) external {
         uint256 borrowableAmount = calculateBorrowableAmount(_amount);
 
@@ -405,14 +431,19 @@ contract OrderBookLL {
         userInfo[msg.sender].collateral += _amount;
     }
 
+    /**
+     * Calculates total allowed borrwable amount.
+     * @param _collateral Total amount of collateral by used
+     */
     function calculateBorrowableAmount(
         uint256 _collateral
     ) public pure returns (uint256) {
         return (_collateral * LTV) / 100;
     }
 
-    function findIndex() internal {}
-
+    /**
+     * Get uni node by index.
+     */
     function getUniNode(uint256 _index) public view returns (uint256, address) {
         require(_index <= uniSize, "Invalid index");
         bytes32 nodeToGet = uniHead;
@@ -422,6 +453,9 @@ contract OrderBookLL {
         return (uniLend[nodeToGet].interestRate, uniLend[nodeToGet].user);
     }
 
+    /**
+     * Get usdt node by index.
+     */
     function getUsdtNode(
         uint256 _index
     ) public view returns (uint256, address) {
